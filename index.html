@@ -67,6 +67,8 @@
   <script type="text/javascript">
     const URL = "https://teachablemachine.withgoogle.com/models/ZwgUkHwE_/";
     let model, webcam, labelContainer, maxPredictions;
+    let lastPredictionTime = 0;
+    const predictionInterval = 500; // in milliseconds (change to 1000 for slower)
 
     async function init() {
       const modelURL = URL + "model.json";
@@ -88,14 +90,20 @@
       labelContainer.innerHTML = "";
       for (let i = 0; i < maxPredictions; i++) {
         const div = document.createElement("div");
-        div.innerHTML = "Class " + (i + 1) + ": 0.00";
+        div.innerHTML = "Class " + (i + 1) + ": 0.00%";
         labelContainer.appendChild(div);
       }
     }
 
-    async function loop() {
+    async function loop(timestamp) {
       webcam.update();
-      await predict();
+
+      // run prediction only every 'predictionInterval' ms
+      if (timestamp - lastPredictionTime > predictionInterval) {
+        await predict();
+        lastPredictionTime = timestamp;
+      }
+
       window.requestAnimationFrame(loop);
     }
 
