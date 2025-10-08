@@ -210,6 +210,10 @@ let lastPredictions = [0,0,0];
 let gestureCatch1 = 0;
 let gestureCatch2 = 0;
 let gestureCatch3 = 0;
+// boolean flags for active gestures (true while considered active)
+let gestureActive1 = false;
+let gestureActive2 = false;
+let gestureActive3 = false;
 
 let canvas = document.getElementById('gameCanvas');
 let ctx = canvas.getContext('2d');
@@ -317,10 +321,28 @@ async function predictionTick(timestamp){
       lastPredictions[i] = preds[i].probability;
       labelContainer[i].innerText = `${preds[i].className}: ${(preds[i].probability*100).toFixed(2)}%`;
     }
-    // Latch gestures: store timestamps when above threshold
-    if(lastPredictions[CLASS_INDEX.c1] >= THRESH.c1) gestureCatch1 = performance.now();
-    if(lastPredictions[CLASS_INDEX.c2] >= THRESH.c2) gestureCatch2 = performance.now();
-    if(lastPredictions[CLASS_INDEX.c3] >= THRESH.c3) gestureCatch3 = performance.now();
+
+    // Latch gestures: store timestamps when above threshold and set active flags
+    if(lastPredictions[CLASS_INDEX.c1] >= THRESH.c1) {
+      gestureCatch1 = now;
+      gestureActive1 = true;
+    } else if (now - gestureCatch1 > LATCH_MS) {
+      gestureActive1 = false;
+    }
+
+    if(lastPredictions[CLASS_INDEX.c2] >= THRESH.c2) {
+      gestureCatch2 = now;
+      gestureActive2 = true;
+    } else if (now - gestureCatch2 > LATCH_MS) {
+      gestureActive2 = false;
+    }
+
+    if(lastPredictions[CLASS_INDEX.c3] >= THRESH.c3) {
+      gestureCatch3 = now;
+      gestureActive3 = true;
+    } else if (now - gestureCatch3 > LATCH_MS) {
+      gestureActive3 = false;
+    }
 
     // add simple UI highlight when detection is active
     updateLabelHighlights();
@@ -332,7 +354,8 @@ function updateLabelHighlights(){
     const el = labelContainer[i];
     if(!el) continue;
     const prob = lastPredictions[i] || 0;
-    if(prob >= (i===CLASS_INDEX.c1?THRESH.c1:(i===CLASS_INDEX.c2?THRESH.c2:THRESH.c3))){
+    const thr = (i===CLASS_INDEX.c1?THRESH.c1:(i===CLASS_INDEX.c2?THRESH.c2:THRESH.c3));
+    if(prob >= thr){
       el.classList.add('detected');
     } else {
       el.classList.remove('detected');
@@ -392,10 +415,6 @@ function hideCenterText(){ centerText.style.display='none'; }
 
 /* -------------------------
    GAME1: Ball Catch
-   - ball falls slowly; user must trigger class1 when ball near bottom
-   - if class1 detected (> THRESH.c1) while ball.y in catch zone -> success
-   - otherwise when ball passes bottom -> fail
-   - On success: show Continue button. Only when user presses Continue the next ball drops.
    ------------------------- */
 function runGame1(dt){
   hideCenterText();
@@ -419,42 +438,38 @@ function runGame1(dt){
 
   // move ball only if active and not waiting for continue
   if(ball.active && !ball.waitingContinue){
-    ball.y += ball.speed; // beginner-friendly slow
+    ball.y += ball.speed;
   }
 
-  // check catch condition
+  // check catch condition using gestureActive1 (robust)
   const class1Prob = lastPredictions[CLASS_INDEX.c1] || 0;
   if(ball.active && !ball.waitingContinue){
-    // If ball is in catch zone, check for gesture within latch window
     if(ball.y >= catchY && ball.y <= canvas.height - 10){
       // show prompt
       ctx.fillStyle = '#000';
       ctx.font = '14px Poppins';
       ctx.fillText('Perform Class1 to catch', 12, catchY - 10);
 
-      // consider latched gesture (within LATCH_MS)
-      if(performance.now() - gestureCatch1 < LATCH_MS){
-        // caught
+      if(gestureActive1){
+        // Caught: disable immediate re-fire by clearing active flag & timestamp
         ball.active = false;
         ball.waitingContinue = true; // pause until Continue clicked
         onWin(0);
-        // reset gesture latch so it does not re-fire
+        gestureActive1 = false;
         gestureCatch1 = 0;
-        // show continue button
         continueBtn.style.display = 'inline-block';
       }
     }
+
     // if ball goes beyond bottom
     if(ball.y > canvas.height + 20){
-      // treat as failed catch
       ball.active = false;
       onFail(0);
-      // auto reset after short delay
       setTimeout(()=> resetBall(), 450);
     }
   }
 
-  // HUD: show progress and status
+  // HUD
   ctx.fillStyle = '#000';
   ctx.font = '14px Poppins';
   ctx.fillText(`Ball ${roundsPlayed+1} / ${GOAL_PER_GAME}`, 12, 20);
@@ -463,7 +478,6 @@ function runGame1(dt){
 
 /* reset ball */
 function resetBall(){
-  // prepare next ball
   ball.x = 30 + Math.random()*(canvas.width-60);
   ball.y = -20;
   ball.r = 16;
@@ -471,9 +485,11 @@ function resetBall(){
   ball.active = true;
   ball.waitingContinue = false;
   roundsPlayed++;
-  // if finished this game's rounds
+  // hide continue
+  continueBtn.style.display = 'none';
+
+  // if finished rounds
   if(roundsPlayed >= GOAL_PER_GAME){
-    // end game1
     setTimeout(()=> {
       gameState = 'inter1';
       setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
@@ -481,29 +497,21 @@ function resetBall(){
       setScore(scores[0]);
       updateSummaries();
       roundsPlayed = 0;
-      // small UI changes handled globally
       continueBtn.style.display = 'none';
     }, 500);
-  } else {
-    // hide continue button (if visible)
-    continueBtn.style.display = 'none';
   }
 }
 
 /* Continue button behaviour (for Game1) */
 continueBtn.onclick = () => {
-  // Only allow continue in game1 waiting state
   if(gameState !== 'game1') return;
   if(ball.waitingContinue){
-    // Move to next round (this increments roundsPlayed in resetBall)
     resetBall();
   }
 };
 
 /* -------------------------
    GAME2: Wrist Move (Class2)
-   - boxes come from right; paddle controlled by class2 probability: when class2 detected, paddle moves right
-   - simple smoothing: use latched gesture to give a stronger response
    ------------------------- */
 function spawnBox(){
   boxList.push({ x: canvas.width - 20, y: 60 + Math.random() * (canvas.height - 140), w: 28, h: 28, caught:false });
@@ -515,7 +523,7 @@ function runGame2(dt){
   btnPause.style.display='inline-block';
   btnRestart.style.display='inline-block';
 
-  // draw paddle at bottom
+  // draw paddle
   const pY = canvas.height - 40;
   ctx.fillStyle = '#2B63A6';
   ctx.fillRect(paddle.x - paddle.w/2, pY, paddle.w, 12);
@@ -524,17 +532,14 @@ function runGame2(dt){
     const b = boxList[i];
     ctx.fillStyle = '#F5A623';
     ctx.fillRect(b.x, b.y, b.w, b.h);
-    // move boxes left slowly
     b.x -= boxSpeed;
   }
 
-  // occasionally spawn boxes if less than some
   if(boxList.length < 3 && Math.random() < 0.015) spawnBox();
 
-  // control paddle using class2 detection:
+  // control paddle using gestureActive2
   const class2Prob = lastPredictions[CLASS_INDEX.c2] || 0;
-  // If class2 latched (recent), move paddle right with boost; else drift left slightly
-  if(performance.now() - gestureCatch2 < LATCH_MS) {
+  if(gestureActive2) {
     paddle.x += 4 * (0.6 + class2Prob);
   } else {
     paddle.x -= 1.5;
@@ -543,19 +548,16 @@ function runGame2(dt){
   if(paddle.x < paddle.w/2) paddle.x = paddle.w/2;
   if(paddle.x > canvas.width - paddle.w/2) paddle.x = canvas.width - paddle.w/2;
 
-  // check collisions: if a box reaches paddle region -> check catch
+  // collisions
   for(let i = boxList.length-1; i>=0; i--){
     const b = boxList[i];
-    // if box hits left edge (missed) => remove and mark fail
     if(b.x + b.w < 0){
       boxList.splice(i,1);
       roundsPlayed++;
-      onFail(1); // a missed box
+      onFail(1);
       continue;
     }
-    // if box intersects paddle
     if(b.y + b.h >= pY && b.y <= pY + 12 && b.x < paddle.x + paddle.w/2 && b.x + b.w > paddle.x - paddle.w/2){
-      // caught
       boxList.splice(i,1);
       roundsPlayed++;
       onWin(1);
@@ -569,7 +571,7 @@ function runGame2(dt){
   ctx.fillText(`Boxes caught: ${scores[1]} / ${GOAL_PER_GAME}`, 12, 20);
   ctx.fillText(`Class2: ${(class2Prob*100).toFixed(0)}%`, 12, 40);
 
-  // if rounds complete
+  // end condition
   if(roundsPlayed >= GOAL_PER_GAME){
     setTimeout(()=> {
       gameState = 'inter2';
@@ -585,8 +587,6 @@ function runGame2(dt){
 
 /* -------------------------
    GAME3: Fist Rotation (Class3)
-   - show circular meter; when class3 detected, meter fills; user must hold to fill the meter
-   - latched detection makes it more forgiving
    ------------------------- */
 function runGame3(dt){
   hideCenterText();
@@ -597,30 +597,24 @@ function runGame3(dt){
 
   const centerX = canvas.width/2;
   const centerY = canvas.height/2;
-  // background circle
   ctx.beginPath();
   ctx.arc(centerX, centerY - 20, 70, 0, Math.PI*2);
   ctx.fillStyle = '#eef6ff';
   ctx.fill(); ctx.closePath();
 
-  // get class3 prob
   const class3Prob = lastPredictions[CLASS_INDEX.c3] || 0;
   ctx.fillStyle = '#222';
   ctx.font = '14px Poppins';
   ctx.fillText(`Class3: ${(class3Prob*100).toFixed(0)}%`, 12, 20);
 
-  // increase rotateProgress only when class3 latched
-  if(performance.now() - gestureCatch3 < LATCH_MS){
-    // fill speed proportional to probability (gentle)
+  if(gestureActive3){
     rotateProgress += 2 * (0.5 + class3Prob*1.0);
   } else {
-    // slight decay so user needs sustained gesture
     rotateProgress -= 1.2;
   }
   if(rotateProgress < 0) rotateProgress = 0;
   if(rotateProgress > rotateTarget) rotateProgress = rotateTarget;
 
-  // draw arc for progress
   const pct = rotateProgress / rotateTarget;
   ctx.beginPath();
   ctx.arc(centerX, centerY - 20, 70, -Math.PI/2, -Math.PI/2 + pct * Math.PI*2);
@@ -628,26 +622,25 @@ function runGame3(dt){
   ctx.lineWidth = 12;
   ctx.stroke(); ctx.closePath();
 
-  // center text
   ctx.fillStyle = '#1E2E4F';
   ctx.font = '18px Poppins';
   ctx.textAlign='center';
   ctx.fillText(Math.floor(pct*100) + '%', centerX, centerY - 18);
 
-  // when completed
   if(rotateProgress >= rotateTarget){
     rotateProgress = 0;
     roundsPlayed++;
+    // prevent immediate re-fire
+    gestureActive3 = false;
+    gestureCatch3 = 0;
     onWin(2);
   }
 
-  // display rounds
   ctx.textAlign='left';
   ctx.fillStyle='#000';
   ctx.font='14px Poppins';
   ctx.fillText(`Round ${roundsPlayed+1} / ${GOAL_PER_GAME}`, 12, canvas.height - 20);
 
-  // if finished
   if(roundsPlayed >= GOAL_PER_GAME){
     setTimeout(()=> {
       gameState = 'end';
@@ -661,10 +654,9 @@ function runGame3(dt){
 }
 
 /* -------------------------
-   WIN / FAIL HANDLERS: visual + audio + state updates
+   WIN / FAIL HANDLERS
    ------------------------- */
 function onWin(gameIdx){
-  // add to score
   scores[gameIdx] = Math.min(GOAL_PER_GAME, scores[gameIdx] + 1);
   setScore(scores[gameIdx]);
   setLastResult('Win!');
@@ -672,12 +664,9 @@ function onWin(gameIdx){
   playWin();
   spawnConfetti();
   showFlash(false);
-  // small center message
   centerText.style.display='block';
   centerText.innerText = 'Great! ✔';
   setTimeout(()=> centerText.style.display='none', 800);
-  // if game1: we pause for continue (handled in runGame1)
-  // for other games we continue automatically
 }
 
 function onFail(gameIdx){
@@ -705,7 +694,6 @@ function showFlash(isFail){
   }
 }
 
-/* confetti: spawn multiple particles */
 function spawnConfetti(){
   for(let i=0;i<40;i++){
     confetti.push({
@@ -720,7 +708,6 @@ function spawnConfetti(){
   }
 }
 
-/* animate confetti */
 function drawConfetti(dt){
   confCtx.clearRect(0,0,confCanvas.width,confCanvas.height);
   for(let i=confetti.length-1;i>=0;i--){
@@ -756,14 +743,11 @@ function drawEndScreen(){
    UI Buttons
    ------------------------- */
 btnStart.onclick = async ()=>{
-  // first click: load model & webcam (if not loaded)
   if(!model){
     await loadModel();
     await startWebcam();
   }
-  // start/continue logic
   if(gameState === 'idle'){
-    // initial start -> game1
     gameState = 'game1'; gameIndex = 0;
     roundsPlayed = 0;
     scores = [0,0,0];
@@ -774,7 +758,6 @@ btnStart.onclick = async ()=>{
     btnPause.style.display='inline-block';
     btnRestart.style.display='inline-block';
     centerText.style.display='none';
-    // ensure ball ready
     resetBall();
   } else if(gameState === 'inter1'){
     gameState = 'game2';
@@ -791,7 +774,7 @@ btnStart.onclick = async ()=>{
 
 btnPause.onclick = ()=>{
   if(gameState !== 'paused'){ gameState = 'paused'; btnPause.innerText='Resume'; setStatus('Paused'); }
-  else { // resume last known gameIndex
+  else {
     if(gameIndex === 0) gameState='game1';
     else if(gameIndex === 1) gameState='game2';
     else if(gameIndex === 2) gameState='game3';
@@ -800,7 +783,6 @@ btnPause.onclick = ()=>{
 };
 
 btnRestart.onclick = ()=>{
-  // reset everything
   scores = [0,0,0]; roundsPlayed=0; updateSummaries(); setScore(0); setGoal(GOAL_PER_GAME);
   gameState = 'idle';
   btnStart.style.display='inline-block';
@@ -809,7 +791,6 @@ btnRestart.onclick = ()=>{
   centerText.style.display='block';
   centerText.innerText = 'Press START to begin';
   setStatus('Waiting');
-  // reset ball and other state
   ball = { x:200, y:-20, r:14, speed:1.2, active:true, waitingContinue:false };
   boxList = [];
   rotateProgress = 0;
@@ -821,7 +802,6 @@ btnRestart.onclick = ()=>{
 (async function initAll(){
   setGoal(GOAL_PER_GAME);
   setStatus('Ready (model not loaded)');
-  // start the animation loop
   requestAnimationFrame(gameLoop);
 })();
 </script>
