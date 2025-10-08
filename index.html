@@ -180,8 +180,9 @@
         <strong>Controls & Tips</strong>
         <div class="small" style="margin-top:6px">
           - Keep gestures clear.<br>
-          - slowly perform the exercise.<br>
-          - pause if you feel tired.<br>
+          - open/close palm for game 1<br>
+          - move wrist left to right in game 2<br>
+          - rotate fist in game 3<br>
           - After a successful catch press Continue to drop next ball.
         </div>
       </div>
@@ -490,8 +491,7 @@ function resetBall(){
 
   // if finished rounds
   if(roundsPlayed >= GOAL_PER_GAME){
-    setTimeout(()=> {
-      gameState = 'inter1';
+      gameState = 'inter1'; // immediately transition
       setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
       setStatus('Finished Class 1');
       setScore(scores[0]);
