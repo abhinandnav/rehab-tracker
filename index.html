@@ -180,8 +180,8 @@
         <strong>Controls & Tips</strong>
         <div class="small" style="margin-top:6px">
           - Keep gestures clear.<br>
-          - Model updates every 600ms (readable).<br>
-          - Thresholds tuned for beginner comfort.<br>
+          - slowly perform the exercise.<br>
+          - pause if you feel tired.<br>
           - After a successful catch press Continue to drop next ball.
         </div>
       </div>
@@ -195,8 +195,8 @@
 const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZwgUkHwE_/"; // keep your model base URL here
 const UPDATE_INTERVAL = 600; // ms  — prediction frequency
 const CLASS_INDEX = { c1: 0, c2: 1, c3: 2 }; // if your model classes order differs, change indices
-const THRESH = { c1: 0.7, c2: 0.6, c3: 0.65 }; // detection thresholds
-const LATCH_MS = 1000; // how long to remember a detected gesture (ms)
+const THRESH = { c1: 0.6, c2: 0.6, c3: 0.65 }; // detection thresholds
+const LATCH_MS = 1500; // how long to remember a detected gesture (ms)
 const GOAL_PER_GAME = 7; // number of successful rounds per game
 
 /* -------------------------
