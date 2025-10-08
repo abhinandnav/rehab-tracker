@@ -514,7 +514,7 @@ continueBtn.onclick = () => {
    GAME2: Wrist Move (Class2)
    ------------------------- */
 function spawnBox(){
-  boxList.push({ x: canvas.width - 20, y: 60 + Math.random() * (canvas.height - 140), w: 28, h: 28, caught:false });
+boxList.push({ x: 20 + Math.random() * (canvas.width - 40), y: -30, w: 28, h: 28, caught:false });
 }
 function runGame2(dt){
   hideCenterText();
@@ -532,7 +532,7 @@ function runGame2(dt){
     const b = boxList[i];
     ctx.fillStyle = '#F5A623';
     ctx.fillRect(b.x, b.y, b.w, b.h);
-    b.x -= boxSpeed;
+    b.y += boxSpeed; // boxes now fall down
   }
 
   if(boxList.length < 3 && Math.random() < 0.015) spawnBox();
