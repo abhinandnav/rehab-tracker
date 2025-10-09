@@ -571,17 +571,19 @@ for(let i=0;i<boxList.length;i++){
   ctx.fillText(`Class2: ${(class2Prob*100).toFixed(0)}%`, 12, 40);
 
   // if rounds complete
-  if(roundsPlayed >= GOAL_PER_GAME){
-    setTimeout(()=> {
-      gameState = 'inter2';
-      setLastResult(`Score: ${scores[1]} / ${GOAL_PER_GAME}`);
-      setStatus('Finished Class 2');
-      setScore(scores[1]);
-      updateSummaries();
-      roundsPlayed = 0;
-      boxList = [];
-    }, 600);
-  }
+ if(roundsPlayed >= GOAL_PER_GAME){
+  setTimeout(()=> {
+    // Automatically start Game 3
+    gameState = 'game3';
+    gameIndex = 2;          // update game index
+    roundsPlayed = 0;       // reset rounds for Game 3
+    setScore(scores[2]);
+    setGoal(GOAL_PER_GAME);
+    setStatus('Starting Class 3');
+    updateSummaries();
+    boxList = [];           // clear leftover boxes
+    centerText.style.display = 'none'; // hide any text
+  }, 600); // 600ms delay for smooth transition
 }
 
 /* -------------------------
