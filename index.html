@@ -743,75 +743,82 @@ function drawEndScreen(){
    UI Buttons
    ------------------------- */
 btnStart.onclick = async () => {
-  if (isModelLoading) return;
+  try {
+    btnStart.disabled = true;
+    setStatus("Loading model...");
 
-  // CLASS 1
-  if (gameState === 'idle') {
-    gameIndex = 0;
-    gameState = 'game1';
-    scores[0] = 0;
-    setScore(0);
-    setGoal(GOAL_PER_GAME);
-    setStatus('Class 1: Catch the Ball');
-    hideCenterText();
-    continueBtn.style.display = 'none';
-    console.log('Starting Class 1');
-    return;
-    if (roundsPlayed >= GOAL_PER_GAME) {
-  gameState = 'inter1'; // ready for Class 2
-  setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
-  setStatus('Finished Class 1');
-  updateSummaries();
-  roundsPlayed = 0;
-  continueBtn.style.display = 'none';
-  btnStart.style.display = 'inline-block'; // show Start again
-  }
+    // 🔹 Load Teachable Machine model only once
+    if (!model) {
+      isModelLoading = true;
+      const modelURL = "https://teachablemachine.withgoogle.com/models/ZwgUkHwE_/";      
+      const metadataURL = "https://teachablemachine.withgoogle.com/models/ZwgUkHwE_/";
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+      console.log("Model loaded successfully");
+      isModelLoading = false;
+    }
 
-  // CLASS 2
-  if (gameState === 'inter1') {
-    gameIndex = 1;
-    gameState = 'game2';
-    scores[1] = 0;
-    setScore(0);
-    setGoal(GOAL_PER_GAME);
-    setStatus('Class 2: Catch the Boxes');
-    hideCenterText();
-    continueBtn.style.display = 'none';
-    boxList = [];
-    console.log('Starting Class 2');
-    return;
-    if (roundsPlayed >= GOAL_PER_GAME) {
-  gameState = 'inter2'; // ready for Class 3
-  setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
-  setStatus('Finished Class 1');
-  updateSummaries();
-  roundsPlayed = 0;
-  continueBtn.style.display = 'none';
-  btnStart.style.display = 'inline-block'; // show Start again
-  }
+    // 🔹 Setup webcam
+    if (!webcam) {
+      webcam = new tmImage.Webcam(200, 200, true); // width, height, flip
+      await webcam.setup();
+      await webcam.play();
+      window.requestAnimationFrame(loop);
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
+      console.log("Webcam started");
+    }
 
-  // CLASS 3
-  if (gameState === 'inter2') {
-    gameIndex = 2;
-    gameState = 'game3';
-    scores[2] = 0;
-    setScore(0);
-    setGoal(GOAL_PER_GAME);
-    setStatus('Class 3: Final Challenge');
-    hideCenterText();
-    continueBtn.style.display = 'none';
-    console.log('Starting Class 3');
-    return;
-    if (roundsPlayed >= GOAL_PER_GAME) {
-  gameState = 'done'; 
-  setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
-  setStatus('Finished Class 1');
-  updateSummaries();
-  roundsPlayed = 0;
-  continueBtn.style.display = 'none';
-  btnStart.style.display = 'none';
+    // 🔹 Now handle class switching
+    if (gameState === "idle") {
+      // Start Class 1
+      gameIndex = 0;
+      gameState = "game1";
+      scores[0] = 0;
+      setScore(0);
+      setGoal(GOAL_PER_GAME);
+      setStatus("Class 1: Catch the Ball");
+      hideCenterText();
+      continueBtn.style.display = "none";
+      console.log("Starting Class 1");
+      return;
+    }
+
+    if (gameState === "inter1") {
+      // Start Class 2
+      gameIndex = 1;
+      gameState = "game2";
+      scores[1] = 0;
+      setScore(0);
+      setGoal(GOAL_PER_GAME);
+      setStatus("Class 2: Catch the Boxes");
+      hideCenterText();
+      continueBtn.style.display = "none";
+      boxList = [];
+      console.log("Starting Class 2");
+      return;
+    }
+
+    if (gameState === "inter2") {
+      // Start Class 3
+      gameIndex = 2;
+      gameState = "game3";
+      scores[2] = 0;
+      setScore(0);
+      setGoal(GOAL_PER_GAME);
+      setStatus("Class 3: Final Challenge");
+      hideCenterText();
+      continueBtn.style.display = "none";
+      console.log("Starting Class 3");
+      return;
+    }
+  } catch (err) {
+    console.error("Error starting model or game:", err);
+    setStatus("Error: check console for details");
+  } finally {
+    btnStart.disabled = false;
   }
 };
+
   
 btnPause.onclick = ()=>{
   if(gameState !== 'paused'){ gameState = 'paused'; btnPause.innerText='Resume'; setStatus('Paused'); }
