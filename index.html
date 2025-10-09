@@ -766,76 +766,36 @@ function drawEndScreen(){
 /* -------------------------
    UI Buttons
    ------------------------- */
-btnStart.onclick = async () => {
-  if (isModelLoading) return;
-
-  // CLASS 1
-  if (gameState === 'idle') {
-    gameIndex = 0;
-    gameState = 'game1';
-    scores[0] = 0;
+btnStart.onclick = async ()=>{
+  if(!model){
+    await loadModel();
+    await startWebcam();
+  }
+  if(gameState === 'idle'){
+    gameState = 'game1'; gameIndex = 0;
+    roundsPlayed = 0;
+    scores = [0,0,0];
+    updateSummaries();
     setScore(0);
     setGoal(GOAL_PER_GAME);
-    setStatus('Class 1: Catch the Ball');
-    hideCenterText();
-    continueBtn.style.display = 'none';
-    console.log('Starting Class 1');
-    return;
-    if (roundsPlayed >= GOAL_PER_GAME) {
-  gameState = 'inter1'; // ready for Class 2
-  setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
-  setStatus('Finished Class 1');
-  updateSummaries();
-  roundsPlayed = 0;
-  continueBtn.style.display = 'none';
-  btnStart.style.display = 'inline-block'; // show Start again
-  }
-
-  // CLASS 2
-  if (gameState === 'inter1') {
-    gameIndex = 1;
+    btnStart.style.display='none';
+    btnPause.style.display='inline-block';
+    btnRestart.style.display='inline-block';
+    centerText.style.display='none';
+    resetBall();
+  } else if(gameState === 'inter1'){
     gameState = 'game2';
-    scores[1] = 0;
-    setScore(0);
-    setGoal(GOAL_PER_GAME);
-    setStatus('Class 2: Catch the Boxes');
-    hideCenterText();
-    continueBtn.style.display = 'none';
-    boxList = [];
-    console.log('Starting Class 2');
-    return;
-    if (roundsPlayed >= GOAL_PER_GAME) {
-  gameState = 'inter2'; // ready for Class 3
-  setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
-  setStatus('Finished Class 1');
-  updateSummaries();
-  roundsPlayed = 0;
-  continueBtn.style.display = 'none';
-  btnStart.style.display = 'inline-block'; // show Start again
-  }
-
-  // CLASS 3
-  if (gameState === 'inter2') {
-    gameIndex = 2;
+    gameIndex = 1;
+    roundsPlayed = 0; setScore(scores[1]); setGoal(GOAL_PER_GAME);
+    centerText.style.display='none'; btnStart.style.display='none';
+  } else if(gameState === 'inter2'){
     gameState = 'game3';
-    scores[2] = 0;
-    setScore(0);
-    setGoal(GOAL_PER_GAME);
-    setStatus('Class 3: Final Challenge');
-    hideCenterText();
-    continueBtn.style.display = 'none';
-    console.log('Starting Class 3');
-    return;
-    if (roundsPlayed >= GOAL_PER_GAME) {
-  gameState = 'done'; 
-  setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
-  setStatus('Finished Class 1');
-  updateSummaries();
-  roundsPlayed = 0;
-  continueBtn.style.display = 'none';
-  btnStart.style.display = 'none';
+    gameIndex = 2;
+    roundsPlayed = 0; setScore(scores[2]); setGoal(GOAL_PER_GAME);
+    centerText.style.display='none'; btnStart.style.display='none';
   }
 };
+
 
 btnPause.onclick = ()=>{
   if(gameState !== 'paused'){ gameState = 'paused'; btnPause.innerText='Resume'; setStatus('Paused'); }
