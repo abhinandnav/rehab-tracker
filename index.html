@@ -502,7 +502,7 @@ continueBtn.onclick = () => {
 
 /* -------------------------
    GAME2: Wrist Move (Class2)
-   - boxes come from top; paddle controlled by class2 probability: when class2 detected, paddle moves right
+   - boxes come from bottom; paddle controlled by class2 probability: when class2 detected, paddle moves right
    - simple smoothing: use latched gesture to give a stronger response
    ------------------------- */
 function spawnBox(){
@@ -524,8 +524,8 @@ function runGame2(dt){
     const b = boxList[i];
     ctx.fillStyle = '#F5A623';
     ctx.fillRect(b.x, b.y, b.w, b.h);
-    // move boxes to bottom slowly
-    b.y -= boxSpeed;
+    // move boxes from top slowly
+    b.x -= boxSpeed;
   }
 
   // occasionally spawn boxes if less than some
