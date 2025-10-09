@@ -1,3 +1,4 @@
+ye wala wo code hai jisme start button work kr rha hai but game one ke baad game 2 ni play hora 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -473,21 +474,17 @@ function resetBall(){
   roundsPlayed++;
   // if finished this game's rounds
   if(roundsPlayed >= GOAL_PER_GAME){
+    // end game1
     setTimeout(()=> {
+      gameState = 'inter1';
       setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
       setStatus('Finished Class 1');
       setScore(scores[0]);
       updateSummaries();
       roundsPlayed = 0;
-      // automatically start Game 2
-      gameState = 'game2';
-      gameIndex = 1;
-      boxList = [];
-      setScore(scores[1]);
-      setGoal(GOAL_PER_GAME);
+      // small UI changes handled globally
+      continueBtn.style.display = 'none';
     }, 500);
-}
-
   } else {
     // hide continue button (if visible)
     continueBtn.style.display = 'none';
@@ -576,21 +573,14 @@ function runGame2(dt){
   // if rounds complete
   if(roundsPlayed >= GOAL_PER_GAME){
     setTimeout(()=> {
+      gameState = 'inter2';
       setLastResult(`Score: ${scores[1]} / ${GOAL_PER_GAME}`);
       setStatus('Finished Class 2');
       setScore(scores[1]);
       updateSummaries();
       roundsPlayed = 0;
       boxList = [];
-      // automatically start Game 3
-      gameState = 'game3';
-      gameIndex = 2;
-      rotateProgress = 0;
-      setScore(scores[2]);
-      setGoal(GOAL_PER_GAME);
     }, 600);
-}
-
   }
 }
 
@@ -767,11 +757,14 @@ function drawEndScreen(){
    UI Buttons
    ------------------------- */
 btnStart.onclick = async ()=>{
+  // first click: load model & webcam (if not loaded)
   if(!model){
     await loadModel();
     await startWebcam();
   }
+  // start/continue logic
   if(gameState === 'idle'){
+    // initial start -> game1
     gameState = 'game1'; gameIndex = 0;
     roundsPlayed = 0;
     scores = [0,0,0];
@@ -782,6 +775,7 @@ btnStart.onclick = async ()=>{
     btnPause.style.display='inline-block';
     btnRestart.style.display='inline-block';
     centerText.style.display='none';
+    // ensure ball ready
     resetBall();
   } else if(gameState === 'inter1'){
     gameState = 'game2';
@@ -795,7 +789,6 @@ btnStart.onclick = async ()=>{
     centerText.style.display='none'; btnStart.style.display='none';
   }
 };
-
 
 btnPause.onclick = ()=>{
   if(gameState !== 'paused'){ gameState = 'paused'; btnPause.innerText='Resume'; setStatus('Paused'); }
