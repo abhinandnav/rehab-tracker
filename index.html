@@ -758,31 +758,40 @@ function drawEndScreen(){
 // -------------------------
 // START button logic
 // -------------------------
-btnStart.onclick = async () => {
-  btnStart.disabled = true;
-  btnStart.innerText = "Starting...";
-
-  if (!model) await loadModel();
-  if (!webcam) await startWebcam();
-
-  setStatus("Ready. Starting Game 1...");
-  setGameName("Ball Catch — Class 1");
-  setScore(0);
-  setGoal(GOAL_PER_GAME);
-  gameState = "game1";
-  btnStart.style.display = "none";
-  btnPause.style.display = "inline-block";
-  btnRestart.style.display = "inline-block";
-
-  scores = [0, 0, 0];
-  roundsPlayed = 0;
-  updateSummaries();
-  resetBall();
-
-  requestAnimationFrame(gameLoop); // this line was already there
+btnStart.onclick = async ()=>{
+  // first click: load model & webcam (if not loaded)
+  if(!model){
+    await loadModel();
+    await startWebcam();
+  }
+  // start/continue logic
+  if(gameState === 'idle'){
+    // initial start -> game1
+    gameState = 'game1'; gameIndex = 0;
+    roundsPlayed = 0;
+    scores = [0,0,0];
+    updateSummaries();
+    setScore(0);
+    setGoal(GOAL_PER_GAME);
+    btnStart.style.display='none';
+    btnPause.style.display='inline-block';
+    btnRestart.style.display='inline-block';
+    centerText.style.display='none';
+    // ensure ball ready
+    resetBall();
+  } else if(gameState === 'inter1'){
+    gameState = 'game2';
+    gameIndex = 1;
+    roundsPlayed = 0; setScore(scores[1]); setGoal(GOAL_PER_GAME);
+    centerText.style.display='none'; btnStart.style.display='none';
+  } else if(gameState === 'inter2'){
+    gameState = 'game3';
+    gameIndex = 2;
+    roundsPlayed = 0; setScore(scores[2]); setGoal(GOAL_PER_GAME);
+    centerText.style.display='none'; btnStart.style.display='none';
+  }
 };
-
-
+  
 btnPause.onclick = ()=>{
   if(gameState !== 'paused'){ gameState = 'paused'; btnPause.innerText='Resume'; setStatus('Paused'); }
   else { // resume last known gameIndex
