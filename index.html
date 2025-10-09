@@ -232,7 +232,7 @@ let ball = { x:200, y:-20, r:14, speed:1.2, active:true, waitingContinue:false }
 
 /* --- Game2 (wrist move paddle) --- */
 let paddle = { x:200, w:120 }; // paddle responds to class2 detection
-let boxList = []; // falling boxes to catch
+let boxList = []; // falling boxes(top to bottom) to catch
 let boxSpeed = 1.0;
 
 /* --- Game3 (fist rotation) --- */
@@ -502,7 +502,7 @@ continueBtn.onclick = () => {
 
 /* -------------------------
    GAME2: Wrist Move (Class2)
-   - boxes come from right; paddle controlled by class2 probability: when class2 detected, paddle moves right
+   - boxes come from top; paddle controlled by class2 probability: when class2 detected, paddle moves right
    - simple smoothing: use latched gesture to give a stronger response
    ------------------------- */
 function spawnBox(){
@@ -524,8 +524,8 @@ function runGame2(dt){
     const b = boxList[i];
     ctx.fillStyle = '#F5A623';
     ctx.fillRect(b.x, b.y, b.w, b.h);
-    // move boxes left slowly
-    b.x -= boxSpeed;
+    // move boxes to bottom slowly
+    b.y -= boxSpeed;
   }
 
   // occasionally spawn boxes if less than some
