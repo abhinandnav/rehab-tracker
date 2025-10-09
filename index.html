@@ -573,7 +573,7 @@ for(let i=0;i<boxList.length;i++){
   // if rounds complete
 if(roundsPlayed >= GOAL_PER_GAME){
     setTimeout(()=> {
-      gameState = 'inter3';
+      gameState = 'inter2';
       setLastResult(`Score: ${scores[1]} / ${GOAL_PER_GAME}`);
       setStatus('Finished Class 2');
       setScore(scores[1]);
@@ -582,6 +582,7 @@ if(roundsPlayed >= GOAL_PER_GAME){
       boxList = [];
     }, 600);
 }
+  
 /* -------------------------
    GAME3: Fist Rotation (Class3)
    - show circular meter; when class3 detected, meter fills; user must hold to fill the meter
