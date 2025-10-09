@@ -502,12 +502,13 @@ continueBtn.onclick = () => {
 
 /* -------------------------
    GAME2: Wrist Move (Class2)
-   - boxes come from bottom; paddle controlled by class2 probability: when class2 detected, paddle moves right
+   - boxes come from top; paddle controlled by class2 probability: when class2 detected, paddle moves right
    - simple smoothing: use latched gesture to give a stronger response
    ------------------------- */
 function spawnBox(){
-  boxList.push({ x: canvas.width - 20, y: 60 + Math.random() * (canvas.height - 140), w: 28, h: 28, caught:false });
+  boxList.push({ x: 60 + Math.random() * (canvas.width - 120), y: -30, w: 28, h: 28, caught:false });
 }
+
 function runGame2(dt){
   hideCenterText();
   setGameName('Wrist Move — Class 2');
@@ -520,13 +521,13 @@ function runGame2(dt){
   ctx.fillStyle = '#2B63A6';
   ctx.fillRect(paddle.x - paddle.w/2, pY, paddle.w, 12);
   // draw boxes
-  for(let i=0;i<boxList.length;i++){
+for(let i=0;i<boxList.length;i++){
     const b = boxList[i];
     ctx.fillStyle = '#F5A623';
     ctx.fillRect(b.x, b.y, b.w, b.h);
-    // move boxes from top slowly
-    b.x -= boxSpeed;
-  }
+    // move boxes vertically downwards
+    b.y += boxSpeed; // <-- change from b.x -= boxSpeed
+}
 
   // occasionally spawn boxes if less than some
   if(boxList.length < 3 && Math.random() < 0.015) spawnBox();
