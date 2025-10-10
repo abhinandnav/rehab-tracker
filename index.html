@@ -8,24 +8,196 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 <style>
-  /* ... (CSS remains exactly the same) ... */
+  :root{
+    --bg: #022F56;
+    --card: rgba(255,255,255,0.95);
+    --accent: #85C4E4;
+  }
+  body{
+    margin:0;
+    height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:"Poppins",sans-serif;
+    background: var(--bg);
+  }
+  .app {
+    width:920px;
+    max-width:96vw;
+    background: var(--card);
+    border-radius:12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    padding:18px;
+    display:grid;
+    grid-template-columns: 440px 1fr;
+    gap:12px;
+  }
+
+  .left {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  h1 { color:#8FB3E2; margin:6px 0 14px; font-size:18px; text-align:center; }
+
+  button.primary {
+    background:#488DB4; color:#000; border: none; padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:600;
+  }
+
+  #gameArea {
+    width:420px; height:520px; background:#CCDEE4; border-radius:10px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.04);
+  }
+
+  canvas#gameCanvas { background: transparent; display:block; }
+
+  .right {
+    padding: 8px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .panel {
+    background: white;
+    border-radius:8px;
+    padding:10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  }
+
+  #webcam-container canvas { width:200px; height:200px; border-radius:8px; border:1px solid #ddd; }
+
+  .labels div { margin:6px 0; background:rgba(0,0,0,0.03); padding:8px; border-radius:6px; font-size:14px; }
+
+  #status { font-weight:700; color:#1E2E4F; margin-bottom:6px; }
+
+  #confettiCanvas { position:absolute; left:0; top:0; pointer-events:none; }
+
+  .bigCenter {
+    position:absolute; left:0; right:0; top:40%; text-align:center; font-size:22px; color:#1E2E4F; font-weight:700;
+    white-space:pre-line;
+  }
+
+  .transition {
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; height:100%;
+  }
+
+  .summary-row { display:flex; justify-content:space-between; padding:6px 8px; border-bottom:1px dashed #eee; }
+  .small { font-size:13px; color:#666; }
+
+  /* flash overlay for fail */
+  #flash {
+    position:absolute; inset:0; background:rgba(255,0,0,0.15); pointer-events:none; opacity:0; transition:opacity 300ms ease;
+  }
+
+  footer.note { text-align:center; font-size:12px; color:#666; margin-top:8px; }
+
+  /* continue button style overlay */
+  #continueBtn {
+    position:absolute;
+    bottom:28px;
+    left:50%;
+    transform:translateX(-50%);
+    background:#34C759;
+    color:#fff;
+    border:none;
+    padding:10px 16px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:700;
+    display:none;
+    box-shadow: 0 6px 14px rgba(34,139,230,0.14);
+  }
+
+  /* small label highlight */
+  .detected {
+    box-shadow: 0 0 0 3px rgba(34,139,230,0.08) inset;
+    border-radius:6px;
+  }
 </style>
 </head>
 <body>
-  <!-- ... (HTML remains exactly the same) ... -->
-</body>
-</html>
+  <div class="app">
+    <div class="left">
+      <h1>Rehabilitation Exercise Tracker — 3 Mini-Games</h1>
+
+      <div id="gameArea" class="panel">
+        <canvas id="gameCanvas" width="400" height="480"></canvas>
+        <canvas id="confettiCanvas" width="400" height="480"></canvas>
+        <div id="flash"></div>
+        <div class="bigCenter" id="centerText">Press START to begin</div>
+        <button id="continueBtn">Continue ▶</button>
+      </div>
+
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <button class="primary" id="btnStart">Start</button>
+        <button id="btnPause" class="primary" style="display:none">Pause</button>
+        <button id="btnRestart" class="primary" style="display:none">Restart</button>
+      </div>
+      <div style="margin-top:8px; display:flex; gap:12px;">
+        <div id="scorePanel" class="panel" style="min-width:150px;">
+          <div><strong>Game</strong></div>
+          <div id="gameName">—</div>
+          <div style="margin-top:6px"><strong>Score</strong> <span id="score">0</span> / <span id="goal">7</span></div>
+        </div>
+
+        <div id="progressPanel" class="panel" style="flex:1;">
+          <div id="status">Status: Waiting</div>
+          <div class="small">Last result: <span id="lastResult">—</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:8px; width:100%;">
+        <footer class="note">Uses your webcam. Allow camera access. Be seated comfortably and keep hand in frame.</footer>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>Webcam</strong>
+          <span class="small">Model predictions</span>
+        </div>
+        <div id="webcam-container" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="panel labels">
+        <div id="class0">Class 1: 0.00%</div>
+        <div id="class1">Class 2: 0.00%</div>
+        <div id="class2">Class 3: 0.00%</div>
+      </div>
+
+      <div class="panel">
+        <strong>Summary</strong>
+        <div class="summary-row"><div>Ball Catch (Class1)</div><div id="sum1">0 / 7</div></div>
+        <div class="summary-row"><div>Wrist Move (Class2)</div><div id="sum2">0 / 7</div></div>
+        <div class="summary-row"><div>Fist Rotate (Class3)</div><div id="sum3">0 / 7</div></div>
+      </div>
+
+      <div class="panel" style="text-align:center">
+        <strong>Controls & Tips</strong>
+        <div class="small" style="margin-top:6px">
+          - Keep gestures clear.<br>
+          - Model updates every 600ms (readable).<br>
+          - Thresholds tuned for beginner comfort.<br>
+          - After a successful catch press Continue to drop next ball.
+        </div>
+      </div>
+    </div>
+  </div>
 
 <script>
 /* -------------------------
    CONFIG (tweak here)
    ------------------------- */
-const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZwgUkHwE_/";
-const UPDATE_INTERVAL = 600;
-const CLASS_INDEX = { c1: 0, c2: 1, c3: 2 };
-const THRESH = { c1: 0.7, c2: 0.6, c3: 0.65 };
-const LATCH_MS = 1000;
-const GOAL_PER_GAME = 7;
+const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZwgUkHwE_/"; // keep your model base URL here
+const UPDATE_INTERVAL = 600; // ms  — prediction frequency
+const CLASS_INDEX = { c1: 0, c2: 1, c3: 2 }; // if your model classes order differs, change indices
+const THRESH = { c1: 0.7, c2: 0.6, c3: 0.65 }; // detection thresholds
+const LATCH_MS = 1000; // how long to remember a detected gesture (ms)
+const GOAL_PER_GAME = 7; // number of successful rounds per game
 
 /* -------------------------
    State & game variables
@@ -34,6 +206,7 @@ let model, webcam, labelContainer, maxPredictions;
 let lastPredTime = 0;
 let lastPredictions = [0,0,0];
 
+// gesture latch timestamps (when model last saw the gesture)
 let gestureCatch1 = 0;
 let gestureCatch2 = 0;
 let gestureCatch3 = 0;
@@ -49,19 +222,27 @@ let btnPause = document.getElementById('btnPause');
 let btnRestart = document.getElementById('btnRestart');
 let continueBtn = document.getElementById('continueBtn');
 
-let gameState = 'idle';
-let gameIndex = 0;
+let gameState = 'idle'; // idle, game1, inter1, game2, inter2, game3, end, paused
+let gameIndex = 0; // 0..2
 let scores = [0,0,0];
 let roundsPlayed = 0;
 
+/* --- Game1 (ball catch) --- */
 let ball = { x:200, y:-20, r:14, speed:1.2, active:true, waitingContinue:false };
-let paddle = { x:200, w:120 };
-let boxList = [];
+
+/* --- Game2 (wrist move paddle) --- */
+let paddle = { x:200, w:120 }; // paddle responds to class2 detection
+let boxList = []; // falling boxes to catch
 let boxSpeed = 1.0;
-let rotateProgress = 0;
+
+/* --- Game3 (fist rotation) --- */
+let rotateProgress = 0; // 0..360 degrees; user must sustain class3 to fill
 let rotateTarget = 360;
+
+/* --- Confetti particles --- */
 let confetti = [];
 
+/* --- Audio (WebAudio) --- */
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function beep(freq=440, time=0.12, type='sine'){
   const o = audioCtx.createOscillator();
@@ -80,6 +261,9 @@ function playWin(){
 }
 function playFail(){ beep(180,0.25,'sawtooth'); }
 
+/* -------------------------
+   UTIL / UI updates
+   ------------------------- */
 function setStatus(text){ document.getElementById('status').innerText = 'Status: ' + text; }
 function setGameName(name){ document.getElementById('gameName').innerText = name; }
 function setScore(n){ document.getElementById('score').innerText = n; }
@@ -91,6 +275,9 @@ function updateSummaries(){
   document.getElementById('sum3').innerText = `${scores[2]} / ${GOAL_PER_GAME}`;
 }
 
+/* -------------------------
+   MODEL + WEBCAM LOADING
+   ------------------------- */
 async function loadModel(){
   setStatus('Loading model...');
   const modelURL = MODEL_URL + 'model.json';
@@ -115,6 +302,9 @@ async function startWebcam(){
   container.appendChild(webcam.canvas);
 }
 
+/* -------------------------
+   PREDICTION LOOP
+   ------------------------- */
 async function predictionTick(timestamp){
   if(!webcam || !model) return;
   webcam.update();
@@ -122,13 +312,17 @@ async function predictionTick(timestamp){
   if(now - lastPredTime >= UPDATE_INTERVAL){
     lastPredTime = now;
     const preds = await model.predict(webcam.canvas);
+    // map probabilities into lastPredictions and UI
     for(let i=0;i<Math.min(3,preds.length);i++){
       lastPredictions[i] = preds[i].probability;
       labelContainer[i].innerText = `${preds[i].className}: ${(preds[i].probability*100).toFixed(2)}%`;
     }
+    // Latch gestures: store timestamps when above threshold
     if(lastPredictions[CLASS_INDEX.c1] >= THRESH.c1) gestureCatch1 = performance.now();
     if(lastPredictions[CLASS_INDEX.c2] >= THRESH.c2) gestureCatch2 = performance.now();
     if(lastPredictions[CLASS_INDEX.c3] >= THRESH.c3) gestureCatch3 = performance.now();
+
+    // add simple UI highlight when detection is active
     updateLabelHighlights();
   }
 }
@@ -146,16 +340,22 @@ function updateLabelHighlights(){
   }
 }
 
+/* -------------------------
+   GAME DRAW / LOGIC LOOP
+   ------------------------- */
 let lastFrame = 0;
 function gameLoop(ts){
   const now = ts || performance.now();
   const dt = Math.min(40, now - lastFrame);
   lastFrame = now;
 
+  // run prediction tick occasionally
   predictionTick();
 
+  // clear
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
+  // routing by state
   if(gameState === 'idle'){
     drawCenterText('Press START to begin', '#1E2E4F');
   } else if(gameState === 'game1'){
@@ -174,10 +374,15 @@ function gameLoop(ts){
     drawCenterText('Paused', '#1E2E4F');
   }
 
+  // confetti draw
   drawConfetti(dt);
+
   requestAnimationFrame(gameLoop);
 }
 
+/* -------------------------
+   DRAW HELPERS
+   ------------------------- */
 function drawCenterText(text, color='#1E2E4F'){
   centerText.style.display='block';
   centerText.style.color = color;
@@ -185,6 +390,13 @@ function drawCenterText(text, color='#1E2E4F'){
 }
 function hideCenterText(){ centerText.style.display='none'; }
 
+/* -------------------------
+   GAME1: Ball Catch
+   - ball falls slowly; user must trigger class1 when ball near bottom
+   - if class1 detected (> THRESH.c1) while ball.y in catch zone -> success
+   - otherwise when ball passes bottom -> fail
+   - On success: show Continue button. Only when user presses Continue the next ball drops.
+   ------------------------- */
 function runGame1(dt){
   hideCenterText();
   continueBtn.style.display = ball.waitingContinue ? 'inline-block' : 'none';
@@ -193,57 +405,75 @@ function runGame1(dt){
   btnPause.style.display='inline-block';
   btnRestart.style.display='inline-block';
 
+  // draw ground indicator (catch zone)
   const catchY = canvas.height - 60;
   ctx.fillStyle = 'rgba(50,200,100,0.06)';
   ctx.fillRect(0, catchY, canvas.width, 60);
 
+  // draw ball
   ctx.beginPath();
   ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
   ctx.fillStyle = '#E43D40';
   ctx.fill();
   ctx.closePath();
 
+  // move ball only if active and not waiting for continue
   if(ball.active && !ball.waitingContinue){
-    ball.y += ball.speed;
+    ball.y += ball.speed; // beginner-friendly slow
   }
 
+  // check catch condition
   const class1Prob = lastPredictions[CLASS_INDEX.c1] || 0;
   if(ball.active && !ball.waitingContinue){
+    // If ball is in catch zone, check for gesture within latch window
     if(ball.y >= catchY && ball.y <= canvas.height - 10){
+      // show prompt
       ctx.fillStyle = '#000';
       ctx.font = '14px Poppins';
       ctx.fillText('Perform Class1 to catch', 12, catchY - 10);
 
+      // consider latched gesture (within LATCH_MS)
       if(performance.now() - gestureCatch1 < LATCH_MS){
+        // caught
         ball.active = false;
-        ball.waitingContinue = true;
+        ball.waitingContinue = true; // pause until Continue clicked
         onWin(0);
+        // reset gesture latch so it does not re-fire
         gestureCatch1 = 0;
+        // show continue button
         continueBtn.style.display = 'inline-block';
       }
     }
+    // if ball goes beyond bottom
     if(ball.y > canvas.height + 20){
+      // treat as failed catch
       ball.active = false;
       onFail(0);
+      // auto reset after short delay
       setTimeout(()=> resetBall(), 450);
     }
   }
 
+  // HUD: show progress and status
   ctx.fillStyle = '#000';
   ctx.font = '14px Poppins';
   ctx.fillText(`Ball ${roundsPlayed+1} / ${GOAL_PER_GAME}`, 12, 20);
   ctx.fillText(`Class1: ${(class1Prob*100).toFixed(0)}%`, 12, 40);
 }
 
+/* reset ball */
 function resetBall(){
+  // prepare next ball
   ball.x = 30 + Math.random()*(canvas.width-60);
   ball.y = -20;
   ball.r = 16;
-  ball.speed = 1.1;
+  ball.speed = 1.1; // slow
   ball.active = true;
   ball.waitingContinue = false;
   roundsPlayed++;
+  // if finished this game's rounds
   if(roundsPlayed >= GOAL_PER_GAME){
+    // end game1
     setTimeout(()=> {
       gameState = 'inter1';
       setLastResult(`Score: ${scores[0]} / ${GOAL_PER_GAME}`);
@@ -251,24 +481,34 @@ function resetBall(){
       setScore(scores[0]);
       updateSummaries();
       roundsPlayed = 0;
+      // small UI changes handled globally
       continueBtn.style.display = 'none';
     }, 500);
   } else {
+    // hide continue button (if visible)
     continueBtn.style.display = 'none';
   }
 }
 
+/* Continue button behaviour (for Game1) */
 continueBtn.onclick = () => {
+  // Only allow continue in game1 waiting state
   if(gameState !== 'game1') return;
   if(ball.waitingContinue){
+    // Move to next round (this increments roundsPlayed in resetBall)
     resetBall();
   }
 };
 
+/* -------------------------
+   GAME2: Wrist Move (Class2)
+   - boxes come from top; paddle controlled by class2 probability: when class2 detected, paddle moves right
+   - simple smoothing: use latched gesture to give a stronger response
+   ------------------------- */
 function spawnBox(){
   boxList.push({ x: 60 + Math.random() * (canvas.width - 120), y: -30, w: 28, h: 28, caught:false });
 }
-
+  
 function runGame2(dt){
   hideCenterText();
   setGameName('Wrist Move — Class 2');
@@ -276,37 +516,47 @@ function runGame2(dt){
   btnPause.style.display='inline-block';
   btnRestart.style.display='inline-block';
 
+  // draw paddle at bottom
   const pY = canvas.height - 40;
   ctx.fillStyle = '#2B63A6';
   ctx.fillRect(paddle.x - paddle.w/2, pY, paddle.w, 12);
-  
+  // draw boxes
   for(let i=0;i<boxList.length;i++){
     const b = boxList[i];
     ctx.fillStyle = '#F5A623';
     ctx.fillRect(b.x, b.y, b.w, b.h);
-    b.y += boxSpeed;
-  }
+    // move boxes vertically downwards
+    b.y += boxSpeed; // <-- change from b.x -= boxSpeed
+}
 
+  // occasionally spawn boxes if less than some
   if(boxList.length < 3 && Math.random() < 0.015) spawnBox();
 
+  // control paddle using class2 detection:
   const class2Prob = lastPredictions[CLASS_INDEX.c2] || 0;
+  // If class2 latched (recent), move paddle right with boost; else drift left slightly
   if(performance.now() - gestureCatch2 < LATCH_MS) {
     paddle.x += 4 * (0.6 + class2Prob);
   } else {
     paddle.x -= 1.5;
   }
+  // clamp
   if(paddle.x < paddle.w/2) paddle.x = paddle.w/2;
   if(paddle.x > canvas.width - paddle.w/2) paddle.x = canvas.width - paddle.w/2;
 
+  // check collisions: if a box reaches paddle region -> check catch
   for(let i = boxList.length-1; i>=0; i--){
     const b = boxList[i];
-    if(b.y > canvas.height){
+    // if box hits left edge (missed) => remove and mark fail
+    if(b.x + b.w < 0){
       boxList.splice(i,1);
       roundsPlayed++;
-      onFail(1);
+      onFail(1); // a missed box
       continue;
     }
+    // if box intersects paddle
     if(b.y + b.h >= pY && b.y <= pY + 12 && b.x < paddle.x + paddle.w/2 && b.x + b.w > paddle.x - paddle.w/2){
+      // caught
       boxList.splice(i,1);
       roundsPlayed++;
       onWin(1);
@@ -314,11 +564,13 @@ function runGame2(dt){
     }
   }
 
+  // HUD
   ctx.fillStyle = '#000';
   ctx.font = '14px Poppins';
   ctx.fillText(`Boxes caught: ${scores[1]} / ${GOAL_PER_GAME}`, 12, 20);
   ctx.fillText(`Class2: ${(class2Prob*100).toFixed(0)}%`, 12, 40);
 
+  // if rounds complete
   if(roundsPlayed >= GOAL_PER_GAME){
     setTimeout(()=> {
       gameState = 'inter2';
@@ -330,8 +582,13 @@ function runGame2(dt){
       boxList = [];
     }, 600);
   }
-} // <- THIS WAS THE MISSING CLOSING BRACE for runGame2
+}
 
+/* -------------------------
+   GAME3: Fist Rotation (Class3)
+   - show circular meter; when class3 detected, meter fills; user must hold to fill the meter
+   - latched detection makes it more forgiving
+   ------------------------- */
 function runGame3(dt){
   hideCenterText();
   setGameName('Fist Rotate — Class 3');
@@ -341,24 +598,30 @@ function runGame3(dt){
 
   const centerX = canvas.width/2;
   const centerY = canvas.height/2;
+  // background circle
   ctx.beginPath();
   ctx.arc(centerX, centerY - 20, 70, 0, Math.PI*2);
   ctx.fillStyle = '#eef6ff';
   ctx.fill(); ctx.closePath();
 
+  // get class3 prob
   const class3Prob = lastPredictions[CLASS_INDEX.c3] || 0;
   ctx.fillStyle = '#222';
   ctx.font = '14px Poppins';
   ctx.fillText(`Class3: ${(class3Prob*100).toFixed(0)}%`, 12, 20);
 
+  // increase rotateProgress only when class3 latched
   if(performance.now() - gestureCatch3 < LATCH_MS){
+    // fill speed proportional to probability (gentle)
     rotateProgress += 2 * (0.5 + class3Prob*1.0);
   } else {
+    // slight decay so user needs sustained gesture
     rotateProgress -= 1.2;
   }
   if(rotateProgress < 0) rotateProgress = 0;
   if(rotateProgress > rotateTarget) rotateProgress = rotateTarget;
 
+  // draw arc for progress
   const pct = rotateProgress / rotateTarget;
   ctx.beginPath();
   ctx.arc(centerX, centerY - 20, 70, -Math.PI/2, -Math.PI/2 + pct * Math.PI*2);
@@ -366,22 +629,26 @@ function runGame3(dt){
   ctx.lineWidth = 12;
   ctx.stroke(); ctx.closePath();
 
+  // center text
   ctx.fillStyle = '#1E2E4F';
   ctx.font = '18px Poppins';
   ctx.textAlign='center';
   ctx.fillText(Math.floor(pct*100) + '%', centerX, centerY - 18);
 
+  // when completed
   if(rotateProgress >= rotateTarget){
     rotateProgress = 0;
     roundsPlayed++;
     onWin(2);
   }
 
+  // display rounds
   ctx.textAlign='left';
   ctx.fillStyle='#000';
   ctx.font='14px Poppins';
   ctx.fillText(`Round ${roundsPlayed+1} / ${GOAL_PER_GAME}`, 12, canvas.height - 20);
 
+  // if finished
   if(roundsPlayed >= GOAL_PER_GAME){
     setTimeout(()=> {
       gameState = 'end';
@@ -394,7 +661,11 @@ function runGame3(dt){
   }
 }
 
+/* -------------------------
+   WIN / FAIL HANDLERS: visual + audio + state updates
+   ------------------------- */
 function onWin(gameIdx){
+  // add to score
   scores[gameIdx] = Math.min(GOAL_PER_GAME, scores[gameIdx] + 1);
   setScore(scores[gameIdx]);
   setLastResult('Win!');
@@ -402,9 +673,12 @@ function onWin(gameIdx){
   playWin();
   spawnConfetti();
   showFlash(false);
+  // small center message
   centerText.style.display='block';
   centerText.innerText = 'Great! ✔';
   setTimeout(()=> centerText.style.display='none', 800);
+  // if game1: we pause for continue (handled in runGame1)
+  // for other games we continue automatically
 }
 
 function onFail(gameIdx){
@@ -420,6 +694,9 @@ function onFail(gameIdx){
   }, 900);
 }
 
+/* -------------------------
+   Flash & Confetti
+   ------------------------- */
 function showFlash(isFail){
   if(isFail){
     flash.style.opacity = 1;
@@ -429,6 +706,7 @@ function showFlash(isFail){
   }
 }
 
+/* confetti: spawn multiple particles */
 function spawnConfetti(){
   for(let i=0;i<40;i++){
     confetti.push({
@@ -443,6 +721,7 @@ function spawnConfetti(){
   }
 }
 
+/* animate confetti */
 function drawConfetti(dt){
   confCtx.clearRect(0,0,confCanvas.width,confCanvas.height);
   for(let i=confetti.length-1;i>=0;i--){
@@ -457,6 +736,9 @@ function drawConfetti(dt){
   }
 }
 
+/* -------------------------
+   TRANSITION & END SCREENS
+   ------------------------- */
 function drawTransition(title, subtitle, btnText){
   centerText.style.display='block';
   centerText.innerText = `${title}\n${subtitle}\n\nPress START to continue`;
@@ -471,12 +753,18 @@ function drawEndScreen(){
   btnPause.style.display='none';
 }
 
+/* -------------------------
+   UI Buttons
+   ------------------------- */
 btnStart.onclick = async ()=>{
+  // first click: load model & webcam (if not loaded)
   if(!model){
     await loadModel();
     await startWebcam();
   }
+  // start/continue logic
   if(gameState === 'idle'){
+    // initial start -> game1
     gameState = 'game1'; gameIndex = 0;
     roundsPlayed = 0;
     scores = [0,0,0];
@@ -487,6 +775,7 @@ btnStart.onclick = async ()=>{
     btnPause.style.display='inline-block';
     btnRestart.style.display='inline-block';
     centerText.style.display='none';
+    // ensure ball ready
     resetBall();
   } else if(gameState === 'inter1'){
     gameState = 'game2';
@@ -500,10 +789,10 @@ btnStart.onclick = async ()=>{
     centerText.style.display='none'; btnStart.style.display='none';
   }
 };
-  
+
 btnPause.onclick = ()=>{
   if(gameState !== 'paused'){ gameState = 'paused'; btnPause.innerText='Resume'; setStatus('Paused'); }
-  else {
+  else { // resume last known gameIndex
     if(gameIndex === 0) gameState='game1';
     else if(gameIndex === 1) gameState='game2';
     else if(gameIndex === 2) gameState='game3';
@@ -512,6 +801,7 @@ btnPause.onclick = ()=>{
 };
 
 btnRestart.onclick = ()=>{
+  // reset everything
   scores = [0,0,0]; roundsPlayed=0; updateSummaries(); setScore(0); setGoal(GOAL_PER_GAME);
   gameState = 'idle';
   btnStart.style.display='inline-block';
@@ -520,14 +810,21 @@ btnRestart.onclick = ()=>{
   centerText.style.display='block';
   centerText.innerText = 'Press START to begin';
   setStatus('Waiting');
+  // reset ball and other state
   ball = { x:200, y:-20, r:14, speed:1.2, active:true, waitingContinue:false };
   boxList = [];
   rotateProgress = 0;
 };
 
+/* -------------------------
+   INITIALIZE & start game loop
+   ------------------------- */
 (async function initAll(){
   setGoal(GOAL_PER_GAME);
   setStatus('Ready (model not loaded)');
+  // start the animation loop
   requestAnimationFrame(gameLoop);
 })();
 </script>
+</body>
+</html>
